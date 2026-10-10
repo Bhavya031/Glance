@@ -16,16 +16,18 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/tiktoken-go/tokenizer"
 )
 
 const (
-	SchemaVersion        = "1"
-	DefaultCharsPerToken = 4.0
-	DefaultMaxFiles      = 10_000
-	DefaultMaxBytes      = int64(32 << 20)
-	DefaultMaxFileBytes  = int64(1 << 20)
-	DefaultLikelyFiles   = 20
-	PlanningLabel        = "user-selected planning assumption, not official/verified"
+	SchemaVersion       = "2"
+	DefaultEncoding     = "o200k_base"
+	DefaultMaxFiles     = 10_000
+	DefaultMaxBytes     = int64(32 << 20)
+	DefaultMaxFileBytes = int64(1 << 20)
+	DefaultLikelyFiles  = 20
+	PlanningLabel       = "user-selected planning assumption, not official/verified"
 )
 
 type Range struct {
@@ -44,7 +46,6 @@ type Prices struct {
 	OutputPerMillion        *float64 `json:"output_per_million,omitempty"`
 }
 type Config struct {
-	CharsPerToken      float64            `json:"chars_per_token"`
 	MaxFiles           int                `json:"max_files"`
 	MaxBytes           int64              `json:"max_bytes"`
 	MaxFileBytes       int64              `json:"max_file_bytes"`
@@ -59,16 +60,13 @@ type Config struct {
 func DefaultConfig() Config {
 	capacity := int64(200_000_000)
 	return Config{
-		CharsPerToken: DefaultCharsPerToken, MaxFiles: DefaultMaxFiles, MaxBytes: DefaultMaxBytes,
+		MaxFiles: DefaultMaxFiles, MaxBytes: DefaultMaxBytes,
 		MaxFileBytes: DefaultMaxFileBytes, LikelyFiles: DefaultLikelyFiles, Calibration: 1,
 		Profiles: map[string]Profile{"standard": {UncachedInput: [2]float64{1, 3}, CachedInput: [2]float64{0, 1}, Output: [2]float64{0.15, 0.75}}},
 		Prices:   Prices{Currency: "USD"}, SubscriptionTokens: &capacity, SubscriptionLabel: PlanningLabel,
 	}
 }
 func (c Config) Validate() error {
-	if c.CharsPerToken < 1 || c.CharsPerToken > 20 {
-		return errors.New("chars_per_token must be between 1 and 20")
-	}
 	if c.MaxFiles < 1 || c.MaxFiles > 1_000_000 {
 		return errors.New("max_files must be between 1 and 1000000")
 	}
@@ -133,16 +131,13 @@ func SaveConfig(path string, c Config) error {
 }
 
 type FileEvidence struct {
-	Path   string `json:"path"`
-	Tokens int64  `json:"tokens"`
-	Score  int    `json:"score"`
+	Path  string `json:"path"`
+	Score int    `json:"score"`
 }
 type Context struct {
-	Approximation    string         `json:"approximation"`
-	Tokens           int64          `json:"tokens"`
-	IssueTokens      int64          `json:"issue_tokens"`
-	LikelyFiles      []FileEvidence `json:"likely_files"`
-	LikelyFileTokens int64          `json:"likely_file_tokens"`
+	Encoding      string         `json:"encoding"`
+	ContextTokens int            `json:"context_tokens"`
+	LikelyFiles   []FileEvidence `json:"likely_files"`
 }
 type RunTokens struct {
 	UncachedInput            Range `json:"uncached_input"`
@@ -168,36 +163,53 @@ type ChangeSize struct {
 	Files Range `json:"files"`
 	Lines Range `json:"lines"`
 }
+type EstimateRange struct {
+	Low     int64 `json:"low"`
+	Central int64 `json:"central"`
+	High    int64 `json:"high"`
+}
+type ExcludedFile struct {
+	Path   string `json:"path"`
+	Reason string `json:"reason"`
+}
 type Estimate struct {
-	SchemaVersion   string     `json:"schema_version"`
-	Product         string     `json:"product"`
-	Mode            string     `json:"mode"`
-	Repository      string     `json:"repository"`
-	Issue           int        `json:"issue,omitempty"`
-	Model           string     `json:"model,omitempty"`
-	Profile         string     `json:"profile"`
-	SelectedContext Context    `json:"selected_context"`
-	WholeRun        RunTokens  `json:"whole_run"`
-	Costs           Costs      `json:"costs"`
-	LikelyInspect   []string   `json:"likely_files_to_inspect"`
-	LikelyModify    []string   `json:"likely_files_to_modify"`
-	ChangeSize      ChangeSize `json:"change_size"`
-	Confidence      string     `json:"confidence"`
-	Evidence        []string   `json:"evidence"`
-	Assumptions     []string   `json:"assumptions"`
-	MissingInfo     []string   `json:"missing_info"`
-	Warnings        []string   `json:"warnings"`
-	ScannedFiles    int        `json:"scanned_files"`
-	ScannedBytes    int64      `json:"scanned_bytes"`
-	Truncated       bool       `json:"truncated"`
-	SkippedBinary   int        `json:"skipped_binary"`
-	SkippedLarge    int        `json:"skipped_large_files"`
+	SchemaVersion    string         `json:"schema_version"`
+	Product          string         `json:"product"`
+	Mode             string         `json:"mode"`
+	Repository       string         `json:"repository"`
+	Issue            int            `json:"issue,omitempty"`
+	Model            string         `json:"model,omitempty"`
+	Profile          string         `json:"profile"`
+	Encoding         string         `json:"encoding"`
+	ContextTokens    int            `json:"context_tokens"`
+	SelectedFiles    []FileEvidence `json:"selected_files"`
+	ExcludedFiles    []ExcludedFile `json:"excluded_files"`
+	EstimatedInput   EstimateRange  `json:"estimated_input_tokens"`
+	EstimatedOutput  EstimateRange  `json:"estimated_output_tokens"`
+	EstimationMethod string         `json:"estimation_method"`
+	SelectedContext  Context        `json:"selected_context"`
+	WholeRun         RunTokens      `json:"whole_run"`
+	Costs            Costs          `json:"costs"`
+	LikelyInspect    []string       `json:"likely_files_to_inspect"`
+	LikelyModify     []string       `json:"likely_files_to_modify"`
+	ChangeSize       ChangeSize     `json:"change_size"`
+	Confidence       string         `json:"confidence"`
+	Evidence         []string       `json:"evidence"`
+	Assumptions      []string       `json:"assumptions"`
+	MissingInfo      []string       `json:"missing_info"`
+	Warnings         []string       `json:"warnings"`
+	ScannedFiles     int            `json:"scanned_files"`
+	ScannedBytes     int64          `json:"scanned_bytes"`
+	Truncated        bool           `json:"truncated"`
+	SkippedBinary    int            `json:"skipped_binary"`
+	SkippedLarge     int            `json:"skipped_large_files"`
 }
 type candidate struct {
 	FileEvidence
+	content []byte
 }
 
-func EstimatePath(path string, issue []byte, repo string, issueNumber int, model, profileName string, c Config) (Estimate, error) {
+func EstimatePath(path string, issue []byte, repo string, issueNumber int, model, profileName, encoding string, c Config) (Estimate, error) {
 	if err := c.Validate(); err != nil {
 		return Estimate{}, err
 	}
@@ -205,12 +217,25 @@ func EstimatePath(path string, issue []byte, repo string, issueNumber int, model
 	if !ok {
 		return Estimate{}, fmt.Errorf("unknown profile %q", profileName)
 	}
+	if _, err := CountTokens("", encoding); err != nil {
+		return Estimate{}, err
+	}
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return Estimate{}, err
 	}
 	terms := searchTerms(string(issue))
-	e := Estimate{SchemaVersion: SchemaVersion, Product: "Glance", Repository: repo, Issue: issueNumber, Model: model, Profile: profileName, Confidence: "low", Assumptions: []string{"offline character approximation; repository content is untrusted and was not executed"}, MissingInfo: []string{"tool output, conversation history, generated context, and final response size are unknown"}}
+	e := Estimate{
+		SchemaVersion: SchemaVersion, Product: "Glance", Repository: repo, Issue: issueNumber, Model: model, Profile: profileName,
+		Encoding: encoding, Confidence: "low", EstimationMethod: "profile ranges applied to measured assembled-context tokens",
+		SelectedFiles: make([]FileEvidence, 0), ExcludedFiles: make([]ExcludedFile, 0),
+		Assumptions: []string{
+			"context_tokens measures the assembled instructions, selected file paths, separators, and file contents with the named encoding",
+			"whole-run input and output ranges are heuristic and are not exact for any model",
+			"repository content is untrusted and was not executed",
+		},
+		MissingInfo: []string{"tool output, conversation history, generated context, reasoning behavior, and final response size are unknown"},
+	}
 	var candidates []candidate
 	err = filepath.WalkDir(abs, func(name string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -229,11 +254,21 @@ func EstimatePath(path string, issue []byte, repo string, issueNumber int, model
 		if name != abs && d.IsDir() && excludedDir(d.Name()) {
 			return filepath.SkipDir
 		}
-		if d.IsDir() || d.Type()&os.ModeSymlink != 0 || sensitivePath(rel) {
+		if d.IsDir() {
+			return nil
+		}
+		rel = filepath.ToSlash(rel)
+		if d.Type()&os.ModeSymlink != 0 {
+			e.ExcludedFiles = append(e.ExcludedFiles, ExcludedFile{Path: rel, Reason: "symlink"})
+			return nil
+		}
+		if sensitivePath(rel) {
+			e.ExcludedFiles = append(e.ExcludedFiles, ExcludedFile{Path: rel, Reason: "sensitive filename"})
 			return nil
 		}
 		if e.ScannedFiles >= c.MaxFiles || e.ScannedBytes >= c.MaxBytes {
 			e.Truncated = true
+			e.ExcludedFiles = append(e.ExcludedFiles, ExcludedFile{Path: rel, Reason: "scan file or byte limit reached"})
 			return fs.SkipAll
 		}
 		info, err := d.Info()
@@ -241,14 +276,17 @@ func EstimatePath(path string, issue []byte, repo string, issueNumber int, model
 			return err
 		}
 		if !info.Mode().IsRegular() {
+			e.ExcludedFiles = append(e.ExcludedFiles, ExcludedFile{Path: rel, Reason: "non-regular file"})
 			return nil
 		}
 		if info.Size() > c.MaxFileBytes {
 			e.SkippedLarge++
+			e.ExcludedFiles = append(e.ExcludedFiles, ExcludedFile{Path: rel, Reason: "exceeds max_file_bytes"})
 			return nil
 		}
 		if info.Size() > c.MaxBytes-e.ScannedBytes {
 			e.Truncated = true
+			e.ExcludedFiles = append(e.ExcludedFiles, ExcludedFile{Path: rel, Reason: "scan byte limit reached"})
 			return fs.SkipAll
 		}
 		b, err := os.ReadFile(name)
@@ -257,11 +295,12 @@ func EstimatePath(path string, issue []byte, repo string, issueNumber int, model
 		}
 		if bytes.IndexByte(b, 0) >= 0 || !utf8.Valid(b) {
 			e.SkippedBinary++
+			e.ExcludedFiles = append(e.ExcludedFiles, ExcludedFile{Path: rel, Reason: "binary or non-UTF-8"})
 			return nil
 		}
 		e.ScannedFiles++
 		e.ScannedBytes += int64(len(b))
-		candidates = append(candidates, candidate{FileEvidence: FileEvidence{Path: filepath.ToSlash(rel), Tokens: Tokens(b, c.CharsPerToken), Score: scoreFile(filepath.ToSlash(rel), b, terms)}})
+		candidates = append(candidates, candidate{FileEvidence: FileEvidence{Path: rel, Score: scoreFile(rel, b, terms)}, content: b})
 		return nil
 	})
 	if err != nil {
@@ -273,47 +312,100 @@ func EstimatePath(path string, issue []byte, repo string, issueNumber int, model
 		}
 		return candidates[i].Score > candidates[j].Score
 	})
+	selected := make([]candidate, 0, c.LikelyFiles)
+	contextBytes := len(assembleContext(issue, nil))
+	if int64(contextBytes) > c.MaxBytes {
+		return Estimate{}, errors.New("instructions exceed max_bytes assembled-context limit")
+	}
 	for _, file := range candidates {
-		if len(e.SelectedContext.LikelyFiles) >= c.LikelyFiles || (file.Score == 0 && len(e.SelectedContext.LikelyFiles) > 0) {
-			break
+		if len(selected) >= c.LikelyFiles || (file.Score == 0 && len(selected) > 0) {
+			e.ExcludedFiles = append(e.ExcludedFiles, ExcludedFile{Path: file.Path, Reason: "not selected by bounded relevance ranking"})
+			continue
 		}
-		e.SelectedContext.LikelyFiles = append(e.SelectedContext.LikelyFiles, file.FileEvidence)
-		e.SelectedContext.LikelyFileTokens += file.Tokens
+		addition := len(assembledFile(file))
+		if int64(contextBytes+addition) > c.MaxBytes {
+			e.ExcludedFiles = append(e.ExcludedFiles, ExcludedFile{Path: file.Path, Reason: "exceeds max_bytes assembled-context limit"})
+			continue
+		}
+		selected = append(selected, file)
+		contextBytes += addition
+		e.SelectedFiles = append(e.SelectedFiles, file.FileEvidence)
 		e.LikelyInspect = append(e.LikelyInspect, file.Path)
 	}
+	e.SelectedContext = Context{Encoding: encoding, LikelyFiles: e.SelectedFiles}
 	for i := 0; i < len(e.LikelyInspect) && i < 5; i++ {
 		e.LikelyModify = append(e.LikelyModify, e.LikelyInspect[i])
 	}
-	e.SelectedContext.IssueTokens = Tokens(issue, c.CharsPerToken)
-	e.SelectedContext.Tokens = e.SelectedContext.IssueTokens + e.SelectedContext.LikelyFileTokens
-	e.SelectedContext.Approximation = fmt.Sprintf("ceil(UTF-8 bytes / %.2f chars_per_token)", c.CharsPerToken)
-	base := float64(e.SelectedContext.Tokens) * c.Calibration
+	contextTokens, err := CountTokens(string(assembleContext(issue, selected)), encoding)
+	if err != nil {
+		return Estimate{}, fmt.Errorf("count assembled context: %w", err)
+	}
+	e.ContextTokens = contextTokens
+	e.SelectedContext.ContextTokens = contextTokens
+	base := float64(contextTokens) * c.Calibration
 	e.WholeRun.UncachedInput = scaledRange(base, profile.UncachedInput)
 	e.WholeRun.CachedInput = scaledRange(base, profile.CachedInput)
 	e.WholeRun.OutputIncludingReasoning = scaledRange(base, profile.Output)
 	e.WholeRun.Total = Range{Low: e.WholeRun.UncachedInput.Low + e.WholeRun.CachedInput.Low + e.WholeRun.OutputIncludingReasoning.Low, High: e.WholeRun.UncachedInput.High + e.WholeRun.CachedInput.High + e.WholeRun.OutputIncludingReasoning.High}
+	e.EstimatedInput = centralRange(Range{Low: e.WholeRun.UncachedInput.Low + e.WholeRun.CachedInput.Low, High: e.WholeRun.UncachedInput.High + e.WholeRun.CachedInput.High})
+	e.EstimatedOutput = centralRange(e.WholeRun.OutputIncludingReasoning)
 	e.ChangeSize = ChangeSize{Files: Range{Low: 1, High: int64(max(1, min(5, len(e.LikelyModify))))}, Lines: Range{Low: 5, High: int64(max(20, min(500, len(issue)*2)))}}
 	e.Costs = CalculateCosts(e.WholeRun, c.Prices, c.SubscriptionTokens, c.SubscriptionLabel)
 	if c.Calibration == 1 {
-		e.Mode = "offline_heuristic_uncalibrated"
+		e.Mode = "offline_tokenizer_uncalibrated"
 		e.Warnings = append(e.Warnings, "uncalibrated estimate")
 	} else {
-		e.Mode = "offline_heuristic_calibrated"
+		e.Mode = "offline_tokenizer_calibrated"
 	}
 	if e.Truncated {
 		e.Warnings = append(e.Warnings, "repository scan stopped at a configured safety limit")
 	}
 	if len(terms) > 0 && len(e.SelectedContext.LikelyFiles) > 0 {
-		e.Confidence = "medium"
 		e.Evidence = append(e.Evidence, fmt.Sprintf("%d bounded filename/text matches selected", len(e.SelectedContext.LikelyFiles)))
 	}
 	return e, nil
 }
-func Tokens(b []byte, charsPerToken float64) int64 {
-	if len(b) == 0 {
-		return 0
+func CountTokens(text, encoding string) (int, error) {
+	var name tokenizer.Encoding
+	switch encoding {
+	case "o200k_base":
+		name = tokenizer.O200kBase
+	case "cl100k_base":
+		name = tokenizer.Cl100kBase
+	default:
+		return 0, fmt.Errorf("unsupported encoding %q; supported encodings are o200k_base and cl100k_base", encoding)
 	}
-	return int64(math.Ceil(float64(len(b)) / charsPerToken))
+	codec, err := tokenizer.Get(name)
+	if err != nil {
+		return 0, fmt.Errorf("initialize %s tokenizer: %w", encoding, err)
+	}
+	ids, _, err := codec.Encode(text)
+	if err != nil {
+		return 0, fmt.Errorf("encode with %s: %w", encoding, err)
+	}
+	return len(ids), nil
+}
+func assembleContext(instructions []byte, files []candidate) []byte {
+	var context bytes.Buffer
+	context.WriteString("Instructions:\n")
+	context.Write(instructions)
+	context.WriteString("\n\n")
+	for _, file := range files {
+		context.Write(assembledFile(file))
+	}
+	return context.Bytes()
+}
+func assembledFile(file candidate) []byte {
+	var section bytes.Buffer
+	section.WriteString("File: ")
+	section.WriteString(file.Path)
+	section.WriteString("\n---\n")
+	section.Write(file.content)
+	section.WriteString("\n---\n\n")
+	return section.Bytes()
+}
+func centralRange(r Range) EstimateRange {
+	return EstimateRange{Low: r.Low, Central: r.Low + (r.High-r.Low)/2, High: r.High}
 }
 func scaledRange(base float64, factor [2]float64) Range {
 	return Range{int64(math.Ceil(base * factor[0])), int64(math.Ceil(base * factor[1]))}
@@ -540,10 +632,6 @@ func median(v []float64) float64 {
 }
 func ParseConfigSet(c *Config, key, value string) error {
 	switch key {
-	case "chars_per_token":
-		if _, err := fmt.Sscan(value, &c.CharsPerToken); err != nil {
-			return err
-		}
 	case "max_files":
 		if _, err := fmt.Sscan(value, &c.MaxFiles); err != nil {
 			return err

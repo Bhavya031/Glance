@@ -47,3 +47,10 @@ func TestGlanceNameAndPaths(t *testing.T) {
 		t.Fatalf("paths=(%q, %q), err=%v", config, records, err)
 	}
 }
+
+func TestSpecialTokenProcessingIsRejected(t *testing.T) {
+	err := estimate([]string{"--special-tokens"}, filepath.Join(t.TempDir(), "config.json"), &strings.Builder{}, &strings.Builder{})
+	if err == nil || !strings.Contains(err.Error(), "special-token processing is not supported") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "empty",
+    "text": "",
+    "o200k_base": 0,
+    "cl100k_base": 0
+  },
+  {
+    "name": "go",
+    "text": "package main\n\nfunc main() {\n\tprintln(\"hello, 世界\")\n}\n",
+    "o200k_base": 15,
+    "cl100k_base": 17
+  },
+  {
+    "name": "python",
+    "text": "def greet(name: str) -> str:\n    return f\"Hello, {name}!\"\n",
+    "o200k_base": 19,
+    "cl100k_base": 19
+  },
+  {
+    "name": "unicode",
+    "text": "नमस्ते दुनिया 🌍 — こんにちは世界",
+    "o200k_base": 11,
+    "cl100k_base": 22
+  },
+  {
+    "name": "assembled",
+    "text": "Instructions:\nFix the parser.\n\nFile: parser.go\n---\npackage parser\n\n---\n\nFile: parser_test.py\n---\ndef test_parse():\n    pass\n\n---\n\n",
+    "o200k_base": 31,
+    "cl100k_base": 31
+  }
+]

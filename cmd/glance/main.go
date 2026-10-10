@@ -68,6 +68,8 @@ func estimate(args []string, defaultConfig string, out, diagnostics io.Writer) e
 	issueNumber := f.Int("issue", 0, "GitHub issue number")
 	model := f.String("model", "", "worker model label")
 	profile := f.String("profile", "standard", "estimation profile")
+	encoding := f.String("encoding", glance.DefaultEncoding, "tokenizer encoding: o200k_base or cl100k_base")
+	specialTokens := f.Bool("special-tokens", false, "request special-token processing (unsupported)")
 	configPath := f.String("config", defaultConfig, "config file")
 	history := f.Bool("history", false, "include up to 100 issue comments")
 	jsonOutput := f.Bool("json", false, "print stable JSON")
@@ -76,6 +78,9 @@ func estimate(args []string, defaultConfig string, out, diagnostics io.Writer) e
 	}
 	if f.NArg() > 1 {
 		return errors.New("estimate accepts at most one local path")
+	}
+	if *specialTokens {
+		return errors.New("special-token processing is not supported; omit --special-tokens")
 	}
 	c, err := glance.LoadConfig(*configPath)
 	if err != nil {
@@ -116,7 +121,7 @@ func estimate(args []string, defaultConfig string, out, diagnostics io.Writer) e
 			defer cleanup()
 		}
 	}
-	e, err := glance.EstimatePath(path, issueText, resolvedRepo, *issueNumber, *model, *profile, c)
+	e, err := glance.EstimatePath(path, issueText, resolvedRepo, *issueNumber, *model, *profile, *encoding, c)
 	if err != nil {
 		return err
 	}
@@ -124,10 +129,15 @@ func estimate(args []string, defaultConfig string, out, diagnostics io.Writer) e
 		return json.NewEncoder(out).Encode(e)
 	}
 	fmt.Fprintf(out, "Glance estimate (%s, confidence %s)\n", e.Mode, e.Confidence)
-	fmt.Fprintf(out, "Selected context: %d approximate tokens\n", e.SelectedContext.Tokens)
+	fmt.Fprintf(out, "Selected context: %d tokens measured with %s\n", e.ContextTokens, e.Encoding)
+	fmt.Fprintf(out, "Estimated input: %d–%d tokens (central %d)\n", e.EstimatedInput.Low, e.EstimatedInput.High, e.EstimatedInput.Central)
+	fmt.Fprintf(out, "Estimated output: %d–%d tokens (central %d)\n", e.EstimatedOutput.Low, e.EstimatedOutput.High, e.EstimatedOutput.Central)
 	fmt.Fprintf(out, "Whole run: %d–%d tokens (uncached %d–%d, cached %d–%d, output incl. reasoning %d–%d)\n", e.WholeRun.Total.Low, e.WholeRun.Total.High, e.WholeRun.UncachedInput.Low, e.WholeRun.UncachedInput.High, e.WholeRun.CachedInput.Low, e.WholeRun.CachedInput.High, e.WholeRun.OutputIncludingReasoning.Low, e.WholeRun.OutputIncludingReasoning.High)
 	fmt.Fprintf(out, "Likely inspect: %s\nChange size: %d–%d files, %d–%d lines\n", strings.Join(e.LikelyInspect, ", "), e.ChangeSize.Files.Low, e.ChangeSize.Files.High, e.ChangeSize.Lines.Low, e.ChangeSize.Lines.High)
-	fmt.Fprintln(out, "Approximation:", e.SelectedContext.Approximation)
+	fmt.Fprintln(out, "Estimation method:", e.EstimationMethod)
+	for _, excluded := range e.ExcludedFiles {
+		fmt.Fprintf(out, "Excluded: %s (%s)\n", excluded.Path, excluded.Reason)
+	}
 	for _, evidence := range e.Evidence {
 		fmt.Fprintln(out, "Evidence:", evidence)
 	}
