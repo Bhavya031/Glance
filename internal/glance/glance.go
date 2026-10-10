@@ -16,8 +16,6 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/tiktoken-go/tokenizer"
 )
 
 const (
@@ -363,26 +361,6 @@ func EstimatePath(path string, issue []byte, repo string, issueNumber int, model
 		e.Evidence = append(e.Evidence, fmt.Sprintf("%d bounded filename/text matches selected", len(e.SelectedContext.LikelyFiles)))
 	}
 	return e, nil
-}
-func CountTokens(text, encoding string) (int, error) {
-	var name tokenizer.Encoding
-	switch encoding {
-	case "o200k_base":
-		name = tokenizer.O200kBase
-	case "cl100k_base":
-		name = tokenizer.Cl100kBase
-	default:
-		return 0, fmt.Errorf("unsupported encoding %q; supported encodings are o200k_base and cl100k_base", encoding)
-	}
-	codec, err := tokenizer.Get(name)
-	if err != nil {
-		return 0, fmt.Errorf("initialize %s tokenizer: %w", encoding, err)
-	}
-	ids, _, err := codec.Encode(text)
-	if err != nil {
-		return 0, fmt.Errorf("encode with %s: %w", encoding, err)
-	}
-	return len(ids), nil
 }
 func assembleContext(instructions []byte, files []candidate) []byte {
 	var context bytes.Buffer
