@@ -84,6 +84,22 @@ func TestAssembledContextLimitExcludesFile(t *testing.T) {
 	}
 }
 
+func TestRankingExclusionsStayBounded(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"a.go", "b.go", "c.go"} {
+		mustWrite(t, filepath.Join(dir, name), []byte("task"))
+	}
+	c := DefaultConfig()
+	c.LikelyFiles = 1
+	e, err := EstimatePath(dir, []byte("task"), "", 0, "", "standard", DefaultEncoding, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(e.SelectedFiles) != 1 || len(e.ExcludedFiles) != 0 {
+		t.Fatalf("ranking inflated exclusions: selected=%d excluded=%+v", len(e.SelectedFiles), e.ExcludedFiles)
+	}
+}
+
 func TestOfficialTokenFixtures(t *testing.T) {
 	b, err := os.ReadFile("testdata/token_counts.json")
 	if err != nil {

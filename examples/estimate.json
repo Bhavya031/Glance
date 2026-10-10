@@ -11,7 +11,7 @@
     {"path": "internal/glance/glance.go", "score": 8}
   ],
   "excluded_files": [
-    {"path": "README.md", "reason": "not selected by bounded relevance ranking"}
+    {"path": "dist/generated.js", "reason": "binary or non-UTF-8"}
   ],
   "estimated_input_tokens": {"low": 24000, "central": 60000, "high": 96000},
   "estimated_output_tokens": {"low": 3600, "central": 10800, "high": 18000},

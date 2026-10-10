@@ -58,8 +58,8 @@ included and isolated file counts are not added together.
 
 The JSON contract is versioned by `schema_version`; see
 [`examples/estimate.json`](examples/estimate.json). It separates selected
-context from heuristic whole-run ranges, reports selected and excluded files
-with reasons, and separates uncached input, cached input, output including
+context from heuristic whole-run ranges, reports selected files and actionable
+scan/context exclusions with reasons, and separates uncached input, cached input, output including
 reasoning, and total. Total includes cached tokens.
 
 ## Record and calibrate

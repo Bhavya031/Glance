@@ -319,8 +319,7 @@ func EstimatePath(path string, issue []byte, repo string, issueNumber int, model
 	}
 	for _, file := range candidates {
 		if len(selected) >= c.LikelyFiles || (file.Score == 0 && len(selected) > 0) {
-			e.ExcludedFiles = append(e.ExcludedFiles, ExcludedFile{Path: file.Path, Reason: "not selected by bounded relevance ranking"})
-			continue
+			break
 		}
 		addition := len(assembledFile(file))
 		if int64(contextBytes+addition) > c.MaxBytes {
