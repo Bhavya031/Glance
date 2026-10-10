@@ -1,0 +1,48 @@
+{
+  "schema_version": "1",
+  "product": "Glance",
+  "mode": "offline_heuristic_uncalibrated",
+  "repository": "owner/repo",
+  "issue": 123,
+  "profile": "standard",
+  "selected_context": {
+    "approximation": "ceil(UTF-8 bytes / 4.00 chars_per_token)",
+    "tokens": 24000,
+    "issue_tokens": 1000,
+    "likely_files": [],
+    "likely_file_tokens": 23000
+  },
+  "whole_run": {
+    "uncached_input": {"low": 24000, "high": 72000},
+    "cached_input": {"low": 0, "high": 24000},
+    "output_including_reasoning": {"low": 3600, "high": 18000},
+    "total": {"low": 27600, "high": 114000}
+  },
+  "costs": {
+    "currency": "USD",
+    "api_equivalent": {
+      "uncached_input": null,
+      "cached_input": null,
+      "output_including_reasoning": null
+    },
+    "actual_cash": null,
+    "subscription_quota": {
+      "capacity_tokens": 200000000,
+      "label": "user-selected planning assumption, not official/verified",
+      "estimated_share": {"low": 0.000138, "high": 0.00057}
+    }
+  },
+  "likely_files_to_inspect": ["internal/taskmeter/taskmeter.go"],
+  "likely_files_to_modify": ["internal/taskmeter/taskmeter.go"],
+  "change_size": {"files": {"low": 1, "high": 3}, "lines": {"low": 5, "high": 200}},
+  "confidence": "medium",
+  "evidence": ["3 bounded filename/text matches selected"],
+  "assumptions": ["offline character approximation; repository content is untrusted and was not executed"],
+  "missing_info": ["tool output, conversation history, generated context, and final response size are unknown"],
+  "warnings": ["uncalibrated estimate"],
+  "scanned_files": 42,
+  "scanned_bytes": 180000,
+  "truncated": false,
+  "skipped_binary": 2,
+  "skipped_large_files": 1
+}
