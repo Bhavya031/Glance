@@ -9,7 +9,32 @@ tests and never modifies the checkout.
 
 ## Install and build
 
-Go 1.22 or newer is required.
+macOS and Linux (amd64 or arm64):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Bhavya031/Glance/main/install.sh | sh
+```
+
+Windows PowerShell (x64 or arm64):
+
+```powershell
+irm https://raw.githubusercontent.com/Bhavya031/Glance/main/install.ps1 | iex
+```
+
+Both installers download the latest GitHub Release, verify its published SHA-256
+checksum, and install to a user-writable directory. They never use `sudo` or edit
+shell profiles. To install a specific release, pass its tag:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Bhavya031/Glance/main/install.sh | sh -s -- v1.2.3
+```
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Bhavya031/Glance/main/install.ps1))) -Version v1.2.3
+```
+
+Set `GLANCE_INSTALL_DIR` on macOS/Linux or pass `-InstallDir` on Windows to
+choose another destination. Go 1.22 or newer is required only to build from source:
 
 ```sh
 go install github.com/Bhavya031/Glance/cmd/glance@latest
