@@ -1,0 +1,14 @@
+# Go build and test output
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Local workspace and editor files
+go.work
+.idea/
+.vscode/
+.DS_Store
