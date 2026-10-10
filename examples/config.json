@@ -1,5 +1,4 @@
 {
-  "chars_per_token": 4,
   "max_files": 10000,
   "max_bytes": 33554432,
   "max_file_bytes": 1048576,

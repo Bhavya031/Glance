@@ -1,6 +1,7 @@
 package glance
 
 import (
+	"encoding/json"
 	"math"
 	"os"
 	"path/filepath"
@@ -16,17 +17,21 @@ func TestEstimateArithmeticAndLimits(t *testing.T) {
 	mustWrite(t, filepath.Join(dir, "large.txt"), []byte("this is far too large"))
 	c := DefaultConfig()
 	c.MaxFileBytes = 15
-	e, err := EstimatePath(dir, []byte("fix task parser"), "owner/repo", 1, "worker", "standard", c)
+	e, err := EstimatePath(dir, []byte("fix task parser"), "owner/repo", 1, "worker", "standard", DefaultEncoding, c)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if e.SelectedContext.IssueTokens != 4 || e.SelectedContext.LikelyFileTokens != 4 || e.SelectedContext.Tokens != 8 {
+	want, err := CountTokens("Instructions:\nfix task parser\n\nFile: task.go\n---\nfix parser task\n---\n\n", DefaultEncoding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.Encoding != DefaultEncoding || e.ContextTokens != want || len(e.SelectedFiles) != 1 || e.SelectedFiles[0].Path != "task.go" {
 		t.Fatalf("unexpected context: %+v", e.SelectedContext)
 	}
-	if e.WholeRun.Total.Low != 10 || e.WholeRun.Total.High != 38 {
+	if e.EstimatedInput.Low != int64(want) || e.EstimatedOutput.Central < e.EstimatedOutput.Low || e.EstimatedOutput.Central > e.EstimatedOutput.High {
 		t.Fatalf("unexpected total: %+v", e.WholeRun.Total)
 	}
-	if e.ScannedFiles != 1 || e.SkippedBinary != 1 || e.SkippedLarge != 1 {
+	if e.ScannedFiles != 1 || e.SkippedBinary != 1 || e.SkippedLarge != 1 || len(e.ExcludedFiles) != 2 {
 		t.Fatalf("limits/exclusions failed: %+v", e)
 	}
 }
@@ -56,12 +61,80 @@ func TestWorktreeGitFileIsExcluded(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, ".git"), []byte("gitdir: elsewhere"))
 	mustWrite(t, filepath.Join(dir, "task.go"), []byte("task"))
-	e, err := EstimatePath(dir, []byte("task"), "", 0, "", "standard", DefaultConfig())
+	e, err := EstimatePath(dir, []byte("task"), "", 0, "", "standard", DefaultEncoding, DefaultConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if e.ScannedFiles != 1 || len(e.LikelyInspect) != 1 || e.LikelyInspect[0] != "task.go" {
 		t.Fatalf("worktree metadata was included: %+v", e)
+	}
+}
+
+func TestAssembledContextLimitExcludesFile(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "fix.go"), []byte("123456789012345678901234567890"))
+	c := DefaultConfig()
+	c.MaxBytes, c.MaxFileBytes = 40, 40
+	e, err := EstimatePath(dir, []byte("fix"), "", 0, "", "standard", DefaultEncoding, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(e.SelectedFiles) != 0 || len(e.ExcludedFiles) != 1 || e.ExcludedFiles[0].Reason != "exceeds max_bytes assembled-context limit" {
+		t.Fatalf("context bound not reported: %+v", e)
+	}
+}
+
+func TestRankingExclusionsStayBounded(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"a.go", "b.go", "c.go"} {
+		mustWrite(t, filepath.Join(dir, name), []byte("task"))
+	}
+	c := DefaultConfig()
+	c.LikelyFiles = 1
+	e, err := EstimatePath(dir, []byte("task"), "", 0, "", "standard", DefaultEncoding, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(e.SelectedFiles) != 1 || len(e.ExcludedFiles) != 0 {
+		t.Fatalf("ranking inflated exclusions: selected=%d excluded=%+v", len(e.SelectedFiles), e.ExcludedFiles)
+	}
+}
+
+func TestOfficialTokenFixtures(t *testing.T) {
+	b, err := os.ReadFile("testdata/token_counts.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixtures []struct {
+		Name   string `json:"name"`
+		Text   string `json:"text"`
+		O200k  int    `json:"o200k_base"`
+		Cl100k int    `json:"cl100k_base"`
+	}
+	if err := json.Unmarshal(b, &fixtures); err != nil {
+		t.Fatal(err)
+	}
+	for _, fixture := range fixtures {
+		for encoding, want := range map[string]int{"o200k_base": fixture.O200k, "cl100k_base": fixture.Cl100k} {
+			t.Run(fixture.Name+"/"+encoding, func(t *testing.T) {
+				got, err := CountTokens(fixture.Text, encoding)
+				if err != nil || got != want {
+					t.Fatalf("CountTokens()=%d, %v; want %d", got, err, want)
+				}
+			})
+		}
+	}
+	if got := string(assembleContext([]byte("Fix the parser."), []candidate{
+		{FileEvidence: FileEvidence{Path: "parser.go"}, content: []byte("package parser\n")},
+		{FileEvidence: FileEvidence{Path: "parser_test.py"}, content: []byte("def test_parse():\n    pass\n")},
+	})); got != fixtures[4].Text {
+		t.Fatalf("assembled context mismatch:\n%q\nwant:\n%q", got, fixtures[4].Text)
+	}
+}
+
+func TestUnsupportedEncoding(t *testing.T) {
+	if _, err := CountTokens("text", "p50k_base"); err == nil || !strings.Contains(err.Error(), "unsupported encoding") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
