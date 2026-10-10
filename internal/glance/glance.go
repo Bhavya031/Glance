@@ -1,4 +1,4 @@
-package taskmeter
+package glance
 
 import (
 	"bufio"

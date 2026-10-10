@@ -32,8 +32,8 @@
       "estimated_share": {"low": 0.000138, "high": 0.00057}
     }
   },
-  "likely_files_to_inspect": ["internal/taskmeter/taskmeter.go"],
-  "likely_files_to_modify": ["internal/taskmeter/taskmeter.go"],
+  "likely_files_to_inspect": ["internal/glance/glance.go"],
+  "likely_files_to_modify": ["internal/glance/glance.go"],
   "change_size": {"files": {"low": 1, "high": 3}, "lines": {"low": 5, "high": 200}},
   "confidence": "medium",
   "evidence": ["3 bounded filename/text matches selected"],

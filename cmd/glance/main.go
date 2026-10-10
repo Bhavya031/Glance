@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Bhavya031/Glance/internal/taskmeter"
+	"github.com/Bhavya031/Glance/internal/glance"
 )
 
 var version = "dev"
@@ -27,7 +27,7 @@ var repoPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintln(os.Stderr, "taskmeter:", err)
+		fmt.Fprintln(os.Stderr, "glance:", err)
 		os.Exit(1)
 	}
 }
@@ -51,7 +51,7 @@ func run(args []string, out, diagnostics io.Writer) error {
 	case "config":
 		return configCommand(args[1:], defaultConfig, defaultRecords, out)
 	case "version", "--version", "-version":
-		fmt.Fprintln(out, "taskmeter", version)
+		fmt.Fprintln(out, "glance", version)
 		return nil
 	case "help", "--help", "-h":
 		usage(out)
@@ -77,7 +77,7 @@ func estimate(args []string, defaultConfig string, out, diagnostics io.Writer) e
 	if f.NArg() > 1 {
 		return errors.New("estimate accepts at most one local path")
 	}
-	c, err := taskmeter.LoadConfig(*configPath)
+	c, err := glance.LoadConfig(*configPath)
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
@@ -116,7 +116,7 @@ func estimate(args []string, defaultConfig string, out, diagnostics io.Writer) e
 			defer cleanup()
 		}
 	}
-	e, err := taskmeter.EstimatePath(path, issueText, resolvedRepo, *issueNumber, *model, *profile, c)
+	e, err := glance.EstimatePath(path, issueText, resolvedRepo, *issueNumber, *model, *profile, c)
 	if err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func record(args []string, defaultConfig, defaultRecords string, out io.Writer) 
 	if f.NArg() != 0 {
 		return errors.New("record accepts flags only")
 	}
-	r := taskmeter.Record{ID: *id, Repo: *repo, Category: *category, Profile: *profile, Config: *configPath, Version: version, Predicted: taskmeter.Predicted{Low: *low, High: *high}, Actual: taskmeter.ActualTokens{UncachedInput: *uncached, CachedInput: *cached, OutputIncludingReasoning: *outputTokens}, VerifiedOutcome: *outcome, CensoredStatus: *censored, Provenance: *provenance, HeldOut: *heldOut}
+	r := glance.Record{ID: *id, Repo: *repo, Category: *category, Profile: *profile, Config: *configPath, Version: version, Predicted: glance.Predicted{Low: *low, High: *high}, Actual: glance.ActualTokens{UncachedInput: *uncached, CachedInput: *cached, OutputIncludingReasoning: *outputTokens}, VerifiedOutcome: *outcome, CensoredStatus: *censored, Provenance: *provenance, HeldOut: *heldOut}
 	if *warning != "" {
 		r.Warnings = []string{*warning}
 	}
@@ -182,7 +182,7 @@ func record(args []string, defaultConfig, defaultRecords string, out io.Writer) 
 	if *censored != "none" && *censored != "failed" && *censored != "budget-stopped" {
 		return errors.New("censored must be none, failed, or budget-stopped")
 	}
-	if err := taskmeter.AppendRecord(*records, r); err != nil {
+	if err := glance.AppendRecord(*records, r); err != nil {
 		return err
 	}
 	fmt.Fprintln(out, "recorded", *id)
@@ -204,17 +204,17 @@ func calibrate(args []string, defaultConfig, defaultRecords string, out io.Write
 		return err
 	}
 	defer file.Close()
-	report, err := taskmeter.Calibrate(file)
+	report, err := glance.Calibrate(file)
 	if err != nil {
 		return err
 	}
 	if report.Factor != nil {
-		c, err := taskmeter.LoadConfig(*configPath)
+		c, err := glance.LoadConfig(*configPath)
 		if err != nil {
 			return err
 		}
 		c.Calibration = *report.Factor
-		if err := taskmeter.SaveConfig(*configPath, c); err != nil {
+		if err := glance.SaveConfig(*configPath, c); err != nil {
 			return err
 		}
 	}
@@ -227,25 +227,25 @@ func configCommand(args []string, defaultConfig, defaultRecords string, out io.W
 	if err := f.Parse(args); err != nil {
 		return err
 	}
-	c, err := taskmeter.LoadConfig(*path)
+	c, err := glance.LoadConfig(*path)
 	if err != nil {
 		return err
 	}
 	rest := f.Args()
 	if len(rest) == 0 {
 		return json.NewEncoder(out).Encode(struct {
-			Config      taskmeter.Config `json:"config"`
-			ConfigPath  string           `json:"config_path"`
-			RecordsPath string           `json:"records_path"`
+			Config      glance.Config `json:"config"`
+			ConfigPath  string        `json:"config_path"`
+			RecordsPath string        `json:"records_path"`
 		}{c, *path, defaultRecords})
 	}
 	if len(rest) != 3 || rest[0] != "set" {
-		return errors.New("usage: taskmeter config [-config path] [set <setting> <value>]")
+		return errors.New("usage: glance config [-config path] [set <setting> <value>]")
 	}
-	if err := taskmeter.ParseConfigSet(&c, rest[1], rest[2]); err != nil {
+	if err := glance.ParseConfigSet(&c, rest[1], rest[2]); err != nil {
 		return err
 	}
-	return taskmeter.SaveConfig(*path, c)
+	return glance.SaveConfig(*path, c)
 }
 
 func fetchIssue(parent context.Context, client *http.Client, repo string, number int, history bool) ([]byte, error) {
@@ -284,7 +284,7 @@ func githubJSON(ctx context.Context, client *http.Client, endpoint string, dst a
 		return err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "Glance-taskmeter/"+version)
+	req.Header.Set("User-Agent", "Glance/"+version)
 	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
@@ -337,8 +337,8 @@ func localRepo(path string) (string, error) {
 	}
 	return raw, nil
 }
-func snapshotRepo(parent context.Context, client *http.Client, repo string, config taskmeter.Config, diagnostics io.Writer) (string, func(), error) {
-	dir, err := os.MkdirTemp("", "taskmeter-")
+func snapshotRepo(parent context.Context, client *http.Client, repo string, config glance.Config, diagnostics io.Writer) (string, func(), error) {
+	dir, err := os.MkdirTemp("", "glance-")
 	if err != nil {
 		return "", nil, err
 	}
@@ -352,7 +352,7 @@ func snapshotRepo(parent context.Context, client *http.Client, repo string, conf
 		return "", nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "Glance-taskmeter/"+version)
+	req.Header.Set("User-Agent", "Glance/"+version)
 	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
@@ -447,7 +447,7 @@ func snapshotRepo(parent context.Context, client *http.Client, repo string, conf
 	return dir, cleanup, nil
 }
 func paths() (string, string, error) {
-	config, records := os.Getenv("TASKMETER_CONFIG"), os.Getenv("TASKMETER_RECORDS")
+	config, records := os.Getenv("GLANCE_CONFIG"), os.Getenv("GLANCE_RECORDS")
 	if config != "" && records != "" {
 		return config, records, nil
 	}
@@ -456,7 +456,7 @@ func paths() (string, string, error) {
 		return "", "", err
 	}
 	if config == "" {
-		config = filepath.Join(dir, "glance", "taskmeter.json")
+		config = filepath.Join(dir, "glance", "glance.json")
 	}
 	if records == "" {
 		records = filepath.Join(dir, "glance", "records.jsonl")
@@ -464,6 +464,6 @@ func paths() (string, string, error) {
 	return config, records, nil
 }
 func usage(w io.Writer) {
-	fmt.Fprintln(w, "Glance taskmeter — safe repository task/token estimator")
-	fmt.Fprintln(w, "usage: taskmeter <estimate|record|calibrate|config|version> [arguments]")
+	fmt.Fprintln(w, "Glance — safe repository task/token estimator")
+	fmt.Fprintln(w, "usage: glance <estimate|record|calibrate|config|version> [arguments]")
 }

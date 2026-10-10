@@ -1,7 +1,7 @@
 version: 2
 builds:
-  - main: ./cmd/taskmeter
-    binary: taskmeter
+  - main: ./cmd/glance
+    binary: glance
     ldflags: -s -w -X main.version={{.Version}}
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
