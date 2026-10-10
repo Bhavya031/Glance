@@ -108,6 +108,7 @@ func TestOfficialTokenFixtures(t *testing.T) {
 	var fixtures []struct {
 		Name   string `json:"name"`
 		Text   string `json:"text"`
+		Repeat int    `json:"repeat"`
 		O200k  int    `json:"o200k_base"`
 		Cl100k int    `json:"cl100k_base"`
 	}
@@ -115,6 +116,9 @@ func TestOfficialTokenFixtures(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, fixture := range fixtures {
+		if fixture.Repeat > 1 {
+			fixture.Text = strings.Repeat(fixture.Text, fixture.Repeat)
+		}
 		for encoding, want := range map[string]int{"o200k_base": fixture.O200k, "cl100k_base": fixture.Cl100k} {
 			t.Run(fixture.Name+"/"+encoding, func(t *testing.T) {
 				got, err := CountTokens(fixture.Text, encoding)

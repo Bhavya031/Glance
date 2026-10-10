@@ -28,5 +28,62 @@
     "text": "Instructions:\nFix the parser.\n\nFile: parser.go\n---\npackage parser\n\n---\n\nFile: parser_test.py\n---\ndef test_parse():\n    pass\n\n---\n\n",
     "o200k_base": 31,
     "cl100k_base": 31
+  },
+  {
+    "name": "contraction",
+    "text": "you're",
+    "o200k_base": 1,
+    "cl100k_base": 2
+  },
+  {
+    "name": "uppercase-contraction",
+    "text": "you'RE",
+    "o200k_base": 3,
+    "cl100k_base": 2
+  },
+  {
+    "name": "whitespace-newlines",
+    "text": " \n \n",
+    "o200k_base": 1,
+    "cl100k_base": 1
+  },
+  {
+    "name": "special-spelling",
+    "text": "<|endoftext|>",
+    "o200k_base": 7,
+    "cl100k_base": 7
+  },
+  {
+    "name": "long-spaces",
+    "text": " ",
+    "repeat": 200000,
+    "o200k_base": 1563,
+    "cl100k_base": 1563
+  },
+  {
+    "name": "long-mixed-whitespace",
+    "text": " \t\n",
+    "repeat": 50000,
+    "o200k_base": 50000,
+    "cl100k_base": 50000
+  },
+  {
+    "name": "space-merge-boundary",
+    "text": " ",
+    "repeat": 129,
+    "o200k_base": 2,
+    "cl100k_base": 2
+  },
+  {
+    "name": "padding-before-word",
+    "text": "                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 x",
+    "o200k_base": 9,
+    "cl100k_base": 9
+  },
+  {
+    "name": "padding-after-word",
+    "text": "x                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 ",
+    "o200k_base": 10,
+    "cl100k_base": 10
   }
 ]

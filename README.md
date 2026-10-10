@@ -120,10 +120,11 @@ official/verified”; set it to `null` or use the command above when unknown.
   15-second request timeout. A required snapshot is capped at 64 MiB compressed
   and 45 seconds, enforces configured extraction limits, is disclosed on stderr,
   and is removed afterward. Git is only required to infer a local origin.
-- `context_tokens` is exact for the assembled text and named tokenizer
-  encoding, not a promise of cross-model usage. Whole-run input/output ranges
-  remain profile heuristics with low confidence until representative history
-  exists. Likely files are bounded filename/text matches, not semantic analysis.
+- `context_tokens` counts the complete assembled text with the named encoding
+  and pinned vocabulary. Saved fixtures match official Python tiktoken; this
+  is not a universal parity or cross-model usage guarantee. Whole-run
+  input/output ranges remain profile heuristics with low confidence until
+  representative history exists. Likely files are bounded filename/text matches, not semantic analysis.
 - Whole-run and change-size ranges are planning heuristics. Tool output,
   generated context, conversation history, reasoning behavior, and final output
   size remain unknown. Calibration can mislead when workload/model changes.
@@ -150,9 +151,21 @@ normal Go tests read the saved counts and do not invoke Python:
 ```sh
 python3 -m venv /tmp/glance-tiktoken-venv
 /tmp/glance-tiktoken-venv/bin/pip install tiktoken==0.14.0
-/tmp/glance-tiktoken-venv/bin/python -c 'import json,tiktoken; p=json.load(open("internal/glance/testdata/token_counts.json")); e={n:tiktoken.get_encoding(n) for n in ("o200k_base","cl100k_base")}; assert all(len(e[n].encode(x["text"]))==x[n] for x in p for n in e); print("verified",len(p),"fixtures against official Python tiktoken")'
+/tmp/glance-tiktoken-venv/bin/python -c 'import json,tiktoken; p=json.load(open("internal/glance/testdata/token_counts.json")); e={n:tiktoken.get_encoding(n) for n in ("o200k_base","cl100k_base")}; assert all(len(e[n].encode(x["text"]*max(1,x.get("repeat",1)),disallowed_special=()))==x[n] for x in p for n in e); print("verified",len(p),"fixtures against official Python tiktoken")'
 ```
 
-The Go runtime pins `github.com/tiktoken-go/tokenizer` v0.4.0, the newest
-release supporting both required encodings without raising Glance's Go 1.22
-baseline. Its full upstream MIT notice is in `THIRD_PARTY_NOTICES.txt`.
+The Go runtime retains `github.com/tiktoken-go/tokenizer` v0.4.0 for its
+compiled vocabularies and Go 1.22 compatibility. Newer releases require newer
+Go versions and retain the quadratic BPE merge loop. Glance's local counting
+adapter uses the same mergeable ranks and regex patterns, bypasses v0.4.0's
+incorrect generated regex engines, and selects rank/leftmost BPE merges with
+a heap to avoid quadratic work on long padding. Special-token spellings remain
+ordinary text. Regex Unicode behavior can still differ from Python tiktoken;
+the fixtures do not establish parity for every possible input. The upstream
+MIT notice is in `THIRD_PARTY_NOTICES.txt`.
+
+Measure the 200,000-space and mixed-whitespace cases without Python:
+
+```sh
+go test ./internal/glance -run '^$' -bench BenchmarkCountTokensPadding -benchmem
+```
