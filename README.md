@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="Glance wordmark" width="240">
+</p>
+
 # Glance
 
 Glance is a single cross-platform CLI that measures selected-context tokens and
@@ -6,6 +10,8 @@ after fetching the requested issue and, only when necessary, extracting a
 bounded repository snapshot into an isolated temporary directory. Repository content is treated
 as untrusted data: Glance never runs repository scripts, hooks, builds, or
 tests and never modifies the checkout.
+
+![Glance poster: count your tokens before your agent starts. One command for Mac, Windows, and Linux.](assets/poster.png)
 
 ## Install and build
 
