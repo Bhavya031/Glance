@@ -54,3 +54,17 @@ func TestSpecialTokenProcessingIsRejected(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestEstimateOptionsFailBeforeRepositoryWork(t *testing.T) {
+	for name, args := range map[string][]string{
+		"encoding": {"--encoding", "o200k", "--repo", "owner/repo", "--issue", "123"},
+		"profile":  {"--profile", "missing", "--repo", "owner/repo", "--issue", "123"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := estimate(args, filepath.Join(t.TempDir(), "config.json"), &strings.Builder{}, &strings.Builder{})
+			if err == nil || (!strings.Contains(err.Error(), "unsupported encoding") && !strings.Contains(err.Error(), "unknown profile")) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}

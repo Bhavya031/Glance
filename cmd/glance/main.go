@@ -86,6 +86,12 @@ func estimate(args []string, defaultConfig string, out, diagnostics io.Writer) e
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
+	if _, ok := c.Profiles[*profile]; !ok {
+		return fmt.Errorf("unknown profile %q", *profile)
+	}
+	if _, err := glance.CountTokens("", *encoding); err != nil {
+		return err
+	}
 	path := "."
 	explicitPath := f.NArg() == 1
 	if explicitPath {
