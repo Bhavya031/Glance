@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -18,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Bhavya031/Glance/internal/glance"
 )
@@ -36,6 +38,9 @@ func run(args []string, out, diagnostics io.Writer) error {
 	if len(args) == 0 {
 		usage(out)
 		return nil
+	}
+	if args[0] == "count" {
+		return count(args[1:], os.Stdin, out, diagnostics)
 	}
 	defaultConfig, defaultRecords, err := paths()
 	if err != nil {
@@ -59,6 +64,61 @@ func run(args []string, out, diagnostics io.Writer) error {
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
+}
+
+const maxCountBytes = 8 << 20
+
+func count(args []string, in io.Reader, out, diagnostics io.Writer) error {
+	f := flag.NewFlagSet("count", flag.ContinueOnError)
+	f.SetOutput(diagnostics)
+	jsonOutput := f.Bool("json", false, "print JSON")
+	encoding := f.String("encoding", glance.DefaultEncoding, "tokenizer encoding: o200k_base or cl100k_base")
+	if err := f.Parse(args); err != nil {
+		return err
+	}
+	if !*jsonOutput || f.NArg() != 1 {
+		return errors.New("usage: glance count --json [--encoding o200k_base|cl100k_base] <file|->")
+	}
+	if _, err := glance.CountTokens("", *encoding); err != nil {
+		return err
+	}
+	if path := f.Arg(0); path != "-" {
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		info, err := file.Stat()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return errors.New("count requires a regular file or stdin (-)")
+		}
+		in = file
+	}
+	data, err := io.ReadAll(io.LimitReader(in, maxCountBytes+1))
+	if err != nil {
+		return err
+	}
+	if len(data) > maxCountBytes {
+		return fmt.Errorf("input exceeds %d-byte limit", maxCountBytes)
+	}
+	if !utf8.Valid(data) || strings.IndexByte(string(data), 0) >= 0 {
+		return errors.New("input must be UTF-8 text without NUL bytes")
+	}
+	tokens, err := glance.CountTokens(string(data), *encoding)
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(out).Encode(struct {
+		SchemaVersion string `json:"schema_version"`
+		GlanceVersion string `json:"glance_version"`
+		Encoding      string `json:"encoding"`
+		ContextTokens int    `json:"context_tokens"`
+		InputBytes    int    `json:"input_bytes"`
+		InputSHA256   string `json:"input_sha256"`
+	}{"1", version, *encoding, tokens, len(data), fmt.Sprintf("%x", sha256.Sum256(data))})
 }
 
 func estimate(args []string, defaultConfig string, out, diagnostics io.Writer) error {
@@ -481,5 +541,6 @@ func paths() (string, string, error) {
 }
 func usage(w io.Writer) {
 	fmt.Fprintln(w, "Glance — safe repository task/token estimator")
-	fmt.Fprintln(w, "usage: glance <estimate|record|calibrate|config|version> [arguments]")
+	fmt.Fprintln(w, "usage: glance <count|estimate|record|calibrate|config|version> [arguments]")
+	fmt.Fprintln(w, "       glance count --json [--encoding o200k_base|cl100k_base] <file|->")
 }
