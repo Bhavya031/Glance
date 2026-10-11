@@ -185,7 +185,7 @@ official/verified”; set it to `null` or use the command above when unknown.
 
 Tags named `v*` run GitHub Actions and GoReleaser to build `glance` archives
 for Linux, macOS, and Windows on amd64 and arm64. Archives include
-`THIRD_PARTY_NOTICES.txt`. Local verification:
+`LICENSE` and `THIRD_PARTY_NOTICES.txt`. Local verification:
 
 ```sh
 go test ./...
