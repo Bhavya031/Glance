@@ -18,6 +18,7 @@ import (
 func TestCountExactBytesFromFileAndStdin(t *testing.T) {
 	for name, input := range map[string][]byte{
 		"empty":   {},
+		"NUL":     {'a', 0, 'b'},
 		"prism":   []byte("Instructions:\nFix the task\n\nFile: a.go\n---\nhello\n---\n\nFile: b.go\n---\nworld\n---\n"),
 		"unicode": []byte("café 世界\r\nlast line\r\n"),
 	} {
@@ -62,7 +63,6 @@ func TestCountRejectsInvalidInputsWithoutJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "input.txt")
 	for name, input := range map[string][]byte{
 		"invalid UTF-8": {0xff},
-		"NUL":           {'a', 0, 'b'},
 		"oversized":     []byte(strings.Repeat("x", maxCountBytes+1)),
 	} {
 		t.Run(name, func(t *testing.T) {

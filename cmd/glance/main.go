@@ -104,8 +104,8 @@ func count(args []string, in io.Reader, out, diagnostics io.Writer) error {
 	if len(data) > maxCountBytes {
 		return fmt.Errorf("input exceeds %d-byte limit", maxCountBytes)
 	}
-	if !utf8.Valid(data) || strings.IndexByte(string(data), 0) >= 0 {
-		return errors.New("input must be UTF-8 text without NUL bytes")
+	if !utf8.Valid(data) {
+		return errors.New("input must be valid UTF-8")
 	}
 	tokens, err := glance.CountTokens(string(data), *encoding)
 	if err != nil {

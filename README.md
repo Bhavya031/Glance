@@ -61,7 +61,7 @@ newlines; it adds no file labels, separators, repository scan, or network input.
 The default encoding is `o200k_base`. Output is one JSON object with
 `schema_version` (`"1"`), `glance_version`, `encoding`, `context_tokens`,
 `input_bytes`, and `input_sha256` (lowercase hex SHA-256 of the exact input
-bytes). Empty input is valid. Invalid UTF-8, NUL bytes, and input above 8 MiB
+bytes). Empty input and NUL bytes are valid. Invalid UTF-8 and input above 8 MiB
 (8,388,608 bytes) fail with an error on stderr and no JSON on stdout.
 
 ## Estimate
