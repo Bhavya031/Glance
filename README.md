@@ -47,6 +47,23 @@ go install github.com/Bhavya031/Glance/cmd/glance@latest
 go build ./cmd/glance
 ```
 
+## Count raw text
+
+```sh
+glance count --json prompt.txt
+cat prompt.txt | glance count --json -
+glance count --json --encoding cl100k_base prompt.txt
+```
+
+`count` reads exactly one regular file or stdin (`-`) as raw UTF-8 text and
+counts it once with the bundled tokenizer. It preserves CRLF and trailing
+newlines; it adds no file labels, separators, repository scan, or network input.
+The default encoding is `o200k_base`. Output is one JSON object with
+`schema_version` (`"1"`), `glance_version`, `encoding`, `context_tokens`,
+`input_bytes`, and `input_sha256` (lowercase hex SHA-256 of the exact input
+bytes). Empty input and NUL bytes are valid. Invalid UTF-8 and input above 8 MiB
+(8,388,608 bytes) fail with an error on stderr and no JSON on stdout.
+
 ## Estimate
 
 From any directory (downloads a bounded `owner/repo` snapshot if it is not the current
