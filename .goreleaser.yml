@@ -9,6 +9,7 @@ archives:
   - formats: [tar.gz]
     files:
       - README.md
+      - LICENSE
       - THIRD_PARTY_NOTICES.txt
     format_overrides:
       - goos: windows
